@@ -296,9 +296,11 @@ constProcessor = new (_services_college__WEBPACK_IMPORTED_MODULE_1___default())(
 const formHandler = new _ui_form_handler__WEBPACK_IMPORTED_MODULE_3__["default"]("courses-form", "alert");
 formHandler.addHandler(course =>{
     const message = dataProcessor.addCourse(course);
+    if (!message) {
     course.id = 100000;
     ulElem.innerHTML += `<li>${JSON.stringify(course)}</li>`;
-})
+    }
+});
 
 })();
 

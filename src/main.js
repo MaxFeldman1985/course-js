@@ -22,6 +22,8 @@ constProcessor = new College(dataProvider, courseData);
 const formHandler = new FormHandler("courses-form", "alert");
 formHandler.addHandler(course =>{
     const message = dataProcessor.addCourse(course);
+    if (!message) {
     course.id = 100000;
     ulElem.innerHTML += `<li>${JSON.stringify(course)}</li>`;
-})
+    }
+});
