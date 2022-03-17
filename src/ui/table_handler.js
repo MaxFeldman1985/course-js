@@ -36,13 +36,12 @@ export default class TableHandler {
         return this.#sortFnName ? `${this.#sortFnName}('${columnDefinition.key}')` : ''
     }
     #getBody(objects) {
-        return objects.map(o => `<tr>${this.#getRecord(o)}</tr>`).join('');
+        return objects.map (o => `<tr>${this.#getRecord(o)}</tr>`).join('');
     }
     #getRecord(object) {
         const record =  this.#columnsDefinition.map(c => `<td>${object[c.key]}</td>`);
         if (this.#removeFnName) {
 
-            record.push(`<td><button onclick="${this.#removeFnName}('${object.id}')">remove</button></td>`)
             record.push(`<td><i style="cursor:pointer" class="bi bi-trash-fill"onclick="${this.#removeFnName}('${object.id}')"></i></td>`)
         }
         return record.join('');

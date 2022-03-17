@@ -17213,6 +17213,28 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/**
 
 /***/ }),
 
+/***/ "./src/config/services-config.js":
+/*!***************************************!*\
+  !*** ./src/config/services-config.js ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "dataProvider": () => (/* binding */ dataProvider)
+/* harmony export */ });
+/* harmony import */ var _courseData_json__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./courseData.json */ "./src/config/courseData.json");
+/* harmony import */ var _services_courses__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../services/courses */ "./src/services/courses.js");
+/* harmony import */ var _services_courses_rest__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../services/courses_rest */ "./src/services/courses_rest.js");
+
+
+
+//export const dataProvider = new Courses(courseData.minId, courseData.maxId);
+const dataProvider = new _services_courses_rest__WEBPACK_IMPORTED_MODULE_2__["default"]('http://localhost:3500/courses')
+
+/***/ }),
+
 /***/ "./src/models/course.js":
 /*!******************************!*\
   !*** ./src/models/course.js ***!
@@ -17252,7 +17274,7 @@ class College {
         this.#courses = courses;
         this.#courseData = courseData;
     }
-    addCourse(course) {
+    async addCourse(course) {
         //TODO validation of the course data
         //if course is valid, then course should be added : this.#courses.add(course)
         //if course is invalid, then the method returns full message describing what's wrong
@@ -17263,7 +17285,7 @@ class College {
         course.openingDate = new Date(course.openingDate);
         const validationMessage = this.#getValidationMessage(course);
         if(!validationMessage) {
-           return this.#courses.add(course);
+           return await this.#courses.add(course);
         } 
         return validationMessage;
     }
@@ -17283,14 +17305,14 @@ class College {
           `wrong opening date - year should be in range [${minYear} - ${maxYear}]` : ''
          return message;
     }
-    getAllCourses() {
-        return this.#courses.get()
+    async getAllCourses() {
+        return await this.#courses.get()
     }
-    sortCourses(key) {
-        return lodash__WEBPACK_IMPORTED_MODULE_0___default().sortBy(this.getAllCourses(), key)
+    async sortCourses(key) {
+        return lodash__WEBPACK_IMPORTED_MODULE_0___default().sortBy(await this.getAllCourses(), key)
     }
-    #getStatistics(interval, field) {
-        const courses = this.getAllCourses();
+    async #getStatistics(interval, field) {
+        const courses = await this.getAllCourses();
         const objStat =  lodash__WEBPACK_IMPORTED_MODULE_0___default().countBy(courses, e => {   
             return Math.floor(e[field]/interval);
          });
@@ -17300,21 +17322,21 @@ class College {
                 amount: objStat[s]}
          })
     }
-     getHoursStatistics(lengthInterval){
+      getHoursStatistics(lengthInterval){
         return this.#getStatistics(lengthInterval, 'hours');
     }
     getCostStatistics(lengthInterval) {
-        return this.#getStatistics(lengthInterval, 'cost')
+        return this.#getStatistics(lengthInterval, 'cost');
     }
-    removeCourse(id) {
-        if (!this.#courses.exists(id)) {
+    
+    async removeCourse(id) {
+        if (!await this.#courses.exists(id)) {
             throw `course with id ${id} not found`
         }
-        return this.#courses.remove(id);
+        return await this.#courses.remove(id);
     }
-
-
-} 
+   
+}
 
 /***/ }),
 
@@ -17332,6 +17354,13 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_random__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils/random */ "./src/utils/random.js");
 // fake Data provisioning module
 
+function getPromise(timeout, value) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(value)
+        }, timeout)
+    })
+}
 //data are the regular JS array
 class Courses {
     #courses
@@ -17345,7 +17374,7 @@ class Courses {
     add(course) {
         course.id = this.#getId();
         this.#courses.push(course);
-        return course;
+        return getPromise(1000, course);
     }
     #getId() {
         //return unique value of id
@@ -17356,18 +17385,85 @@ class Courses {
         return id;
     }
     exists(id) {
-        return !!this.#courses.find(c => c.id === id);
+        
+        return getPromise(100, !!this.#courses.find(c => c.id === id));
     }
     get() {
-        return this.#courses;
+        return getPromise(2000, this.#courses);
     }
     remove(id) {
         const index = this.#courses.findIndex(c => c.id === id);
         const res = this.#courses[index];
         this.#courses.splice(index, 1);
+        return getPromise(1000, res);
+    }
+}
+
+/***/ }),
+
+/***/ "./src/services/courses_rest.js":
+/*!**************************************!*\
+  !*** ./src/services/courses_rest.js ***!
+  \**************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ CoursesRest)
+/* harmony export */ });
+class CoursesRest {
+    #url
+    constructor(url) {
+        this.#url = url;
+    }
+    async add(course) {
+        const response = await fetch(this.#url, {
+            method: 'POST',
+            headers: {
+                'Content-Type':'application/json'
+            },
+            body: JSON.stringify(course)
+        });
+        return await response.json();
+    }
+    async get() {
+        const response = await fetch(this.#url);
+        const courses = await response.json();
+        return courses.map(c => {
+            c.openingDate = c.openingDate.substring(0, 10);
+            return c;
+        })
+    }
+    async remove(id) {
+        const res = this.getCourse(id);
+        await fetch(this.#getUrlById(id), {
+            method: 'DELETE'
+        })
+        return res;
+
+
+    }
+    #getUrlById(id) {
+        return `${this.#url}/${id}`;
+    }
+
+    async getCourse(id) {
+        const response = await fetch(this.#getUrlById(id));
+        return await response.json();
+    }
+    async exists(id) {
+        let res;
+        try {
+            await fetch(this.#getUrlById(id));
+            res = true;
+        } catch (err) {
+            console.log(err);
+            res = false;
+        }
         return res;
     }
-} 
+}
 
 /***/ }),
 
@@ -17392,14 +17488,14 @@ class FormHandler {
         this.#inputElements = document.querySelectorAll(`#${idForm} [name]`);
     }
     addHandler(fnProcessor) {
-        this.#formElement.addEventListener('submit', event => {
+        this.#formElement.addEventListener('submit', async event => {
             event.preventDefault();
             const data = Array.from(this.#inputElements)
             .reduce((obj, element) => {
                 obj[element.name] = element.value;
                 return obj;
             }, {})
-            const message = fnProcessor(data);
+            const message = await fnProcessor(data);
             if (!message) {
                 this.#formElement.reset(); //everything ok
                 this.#alertElement.innerHTML = '';
@@ -17474,6 +17570,35 @@ class NavigatorButtons {
 
 /***/ }),
 
+/***/ "./src/ui/spinner.js":
+/*!***************************!*\
+  !*** ./src/ui/spinner.js ***!
+  \***************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ Spinner)
+/* harmony export */ });
+class Spinner {
+    #spinnerParentElem
+    constructor(parentId) {
+        this.#spinnerParentElem = document.getElementById(parentId);
+
+    }
+    start() {
+        this.#spinnerParentElem.innerHTML = `<div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>`
+    }
+    stop() {
+        this.#spinnerParentElem.innerHTML=''
+    }
+}
+
+/***/ }),
+
 /***/ "./src/ui/table_handler.js":
 /*!*********************************!*\
   !*** ./src/ui/table_handler.js ***!
@@ -17523,13 +17648,12 @@ class TableHandler {
         return this.#sortFnName ? `${this.#sortFnName}('${columnDefinition.key}')` : ''
     }
     #getBody(objects) {
-        return objects.map(o => `<tr>${this.#getRecord(o)}</tr>`).join('');
+        return objects.map (o => `<tr>${this.#getRecord(o)}</tr>`).join('');
     }
     #getRecord(object) {
         const record =  this.#columnsDefinition.map(c => `<td>${object[c.key]}</td>`);
         if (this.#removeFnName) {
 
-            record.push(`<td><button onclick="${this.#removeFnName}('${object.id}')">remove</button></td>`)
             record.push(`<td><i style="cursor:pointer" class="bi bi-trash-fill"onclick="${this.#removeFnName}('${object.id}')"></i></td>`)
         }
         return record.join('');
@@ -17715,13 +17839,14 @@ var __webpack_exports__ = {};
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _config_courseData_json__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./config/courseData.json */ "./src/config/courseData.json");
 /* harmony import */ var _services_college__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./services/college */ "./src/services/college.js");
-/* harmony import */ var _services_courses__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./services/courses */ "./src/services/courses.js");
+/* harmony import */ var _config_services_config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./config/services-config */ "./src/config/services-config.js");
 /* harmony import */ var _ui_form_handler__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./ui/form_handler */ "./src/ui/form_handler.js");
 /* harmony import */ var _ui_table_handler__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./ui/table_handler */ "./src/ui/table_handler.js");
 /* harmony import */ var _utils_randomCourse__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./utils/randomCourse */ "./src/utils/randomCourse.js");
 /* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! lodash */ "./node_modules/lodash/lodash.js");
 /* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(lodash__WEBPACK_IMPORTED_MODULE_6__);
 /* harmony import */ var _ui_navigator_buttons__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./ui/navigator_buttons */ "./src/ui/navigator_buttons.js");
+/* harmony import */ var _ui_spinner__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./ui/spinner */ "./src/ui/spinner.js");
 
 
 
@@ -17730,46 +17855,43 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const N_COURSES = 5;
+
 const statisticsColumnDefinition = [
     { key: "minInterval", displayName: "From" },
     { key: "maxInterval", displayName: "To" },
     { key: "amount", displayName: "Amount" }
 ]
-function createCourses() {
-    const courses = [];
-    for (let i = 0; i < N_COURSES; i++) {
-        courses.push((0,_utils_randomCourse__WEBPACK_IMPORTED_MODULE_5__.getRandomCourse)(_config_courseData_json__WEBPACK_IMPORTED_MODULE_0__));
-    }
-    return courses;
-}
-
-
-const courses = createCourses();
-
-const dataProvider = new _services_courses__WEBPACK_IMPORTED_MODULE_2__["default"](_config_courseData_json__WEBPACK_IMPORTED_MODULE_0__.minId, _config_courseData_json__WEBPACK_IMPORTED_MODULE_0__.maxId, courses);
-const dataProcessor = new _services_college__WEBPACK_IMPORTED_MODULE_1__["default"](dataProvider, _config_courseData_json__WEBPACK_IMPORTED_MODULE_0__);
+const dataProcessor = new _services_college__WEBPACK_IMPORTED_MODULE_1__["default"](_config_services_config__WEBPACK_IMPORTED_MODULE_2__.dataProvider, _config_courseData_json__WEBPACK_IMPORTED_MODULE_0__);
 const tableHandler = new _ui_table_handler__WEBPACK_IMPORTED_MODULE_4__["default"]([
     { key: 'id', displayName: 'ID' },
     { key: 'name', displayName: 'Course' },
     { key: 'lecturer', displayName: 'Lecturer' },
     { key: 'cost', displayName: "Cost (ILS)" },
-    { key: 'hours', displayName: "Duration (h)" }
+    { key: 'hours', displayName: "Duration (h)" },
+    { key: 'openingDate', displayName: "Date"},
 ], "courses-table", "sortCourses", "removeCourse");
 const formHandler = new _ui_form_handler__WEBPACK_IMPORTED_MODULE_3__["default"]("courses-form", "alert");
 const generationHandler = new _ui_form_handler__WEBPACK_IMPORTED_MODULE_3__["default"]("generation-form", "alert");
-const navigator = new _ui_navigator_buttons__WEBPACK_IMPORTED_MODULE_7__["default"](["0","1","2", "3", "4"])
-formHandler.addHandler(course => {
-    const res = dataProcessor.addCourse(course);
+const navigator = new _ui_navigator_buttons__WEBPACK_IMPORTED_MODULE_7__["default"](["0","1","2", "3", "4"]);
+const spinner = new _ui_spinner__WEBPACK_IMPORTED_MODULE_8__["default"]("spinner");
+async function asyncRequestWithSpinner(asyncFn) {
+    spinner.start();
+    const res = await asyncFn();
+    spinner.stop();
+    return res;
+}
+formHandler.addHandler(async course => {
+    const res = await asyncRequestWithSpinner
+     (dataProcessor.addCourse.bind(dataProcessor, course)); //await dataProcessor.addCourse(course)
     if (typeof (res) !== 'string') {
         return '';
     }
     return res;
-
 })
-generationHandler.addHandler(generation => {
+generationHandler.addHandler(async generation => {
     for (let i=0; i < generation.nCourses; i++) {
-        dataProcessor.addCourse((0,_utils_randomCourse__WEBPACK_IMPORTED_MODULE_5__.getRandomCourse)(_config_courseData_json__WEBPACK_IMPORTED_MODULE_0__));
+         asyncRequestWithSpinner ( 
+             dataProcessor.addCourse.bind(dataProcessor, (0,_utils_randomCourse__WEBPACK_IMPORTED_MODULE_5__.getRandomCourse)(_config_courseData_json__WEBPACK_IMPORTED_MODULE_0__)));
     }
     return '';
 })
@@ -17785,7 +17907,6 @@ function hide() {
     generationHandler.hide();
     tableHoursStatistics.hideTable();
     tableCostStatistics.hideTable();
-
 }
 window.showGeneration = () => {
     hide();
@@ -17796,35 +17917,37 @@ window.showForm = () => {
     hide();
     navigator.setActive(0);
     formHandler.show();
-
 }
-window.showCourses = () => {
+window.showCourses = async () => {
     hide();
     navigator.setActive(1);
-    tableHandler.showTable(dataProcessor.getAllCourses());
-
+    tableHandler.showTable
+    (await asyncRequestWithSpinner(dataProcessor.getAllCourses.bind(dataProcessor)));
 }
-window.showHoursStatistics = () => {
+window.showHoursStatistics = async () => {
     hide()
     navigator.setActive(2);
-    tableHoursStatistics.showTable(dataProcessor.getHoursStatistics(_config_courseData_json__WEBPACK_IMPORTED_MODULE_0__.hoursInterval));
-
+    tableHoursStatistics.showTable(await asyncRequestWithSpinner 
+        (dataProcessor.getHoursStatistics.bind(dataProcessor, _config_courseData_json__WEBPACK_IMPORTED_MODULE_0__.hoursInterval)));
 }
-window.showCostStatistics = () => {
+window.showCostStatistics = async () => {
     hide()
     navigator.setActive(3);
-    tableCostStatistics.showTable(dataProcessor.getCostStatistics(_config_courseData_json__WEBPACK_IMPORTED_MODULE_0__.costInterval));
-
+    tableCostStatistics.showTable(await asyncRequestWithSpinner 
+        (dataProcessor.getCostStatistics.bind(dataProcessor, _config_courseData_json__WEBPACK_IMPORTED_MODULE_0__.costInterval)));
 }
-window.sortCourses = (key) => {
-    tableHandler.showTable(dataProcessor.sortCourses(key))
+window.sortCourses = async (key) => {
+    tableHandler.showTable(await asyncRequestWithSpinner (dataProcessor.sortCourses.bind(dataProcessor, key)))
 }
-window.removeCourse = (id) => {
+window.removeCourse = async (id) => {
     if (window.confirm(`you are going to remove course id: ${id}`)) {
-        dataProcessor.removeCourse(+id);
-        tableHandler.showTable(dataProcessor.getAllCourses());
+        await dataProcessor.removeCourse(+id);
+        tableHandler.showTable(await asyncRequestWithSpinner(dataProcessor.getAllCourses.bind(dataProcessor)));
     }
 }
+//HW
+//сделать дату
+//
 })();
 
 /******/ })()
